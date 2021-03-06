@@ -1,0 +1,12 @@
+[{
+  "operation": "shift",
+  "spec": {
+    "lineitems": {
+      "*": {
+        "@(2,userid)": "[#2].userid",
+        "@productid": "[#2].productid",
+        "@quantity": "[#2].quantity"
+      }
+    }
+  }
+}]
