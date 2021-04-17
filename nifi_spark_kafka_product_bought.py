@@ -2,6 +2,16 @@ from pyspark.sql import SparkSession, Window
 from pyspark.sql.functions import from_json, col, to_timestamp, window, expr, sum, approx_count_distinct, desc
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 
+#Define foreach batch function to aggrate stream data several times
+def foreach_batch_func(df, epoch_id):
+    df = df.groupBy(col("categoryid")).sum("count")
+    df = df.withColumnRenamed("sum(count)","count")
+    df = df.sort(desc("count"))
+    df \
+        .write.format("console") \
+        .save()
+    pass
+
 if __name__ == "__main__":
     spark = SparkSession \
         .builder \
@@ -9,6 +19,7 @@ if __name__ == "__main__":
         .master("local[3]") \
         .config("spark.streaming.stopGracefullyOnShutdown", "true") \
         .config("spark.sql.shuffle.partitions", 2) \
+        .config("spark.sql.codegen.wholeStag","false") \
         .getOrCreate()
 
 #Describe schema (userid,productid, quantity and timestamp will be enough to find most bought category)
@@ -47,9 +58,9 @@ if __name__ == "__main__":
 #Groupby product_id and count considering distinct users
 #Rename new column as count
     window_count_df = transformed_df \
-        .withWatermark("timestamp", "60 minute") \
+        .withWatermark("timestamp", "10 seconds") \
         .groupBy(col("productid"),
-            window(col("timestamp"),"60 minute")) \
+            window(col("timestamp"),"10 seconds")) \
             .agg(approx_count_distinct("userid").alias("count"))
 
 #Select everything from dataframe and sort by highest to lowest count rate
@@ -60,14 +71,16 @@ if __name__ == "__main__":
     dict = dict_df.select('_c0', '_c1').rdd.collectAsMap()
 #Map current dataframe with created dictionary to replace product_id with category name
     output_df = output_df.na.replace(dict, 1)
+#Rename product_id column to category id 
+    output_df = output_df.withColumnRenamed("productid","categoryid")
+
 #Write spark stream to console or csv sink
     window_query = output_df.writeStream \
-    .format("console") \
+    .foreachBatch(lambda df, epoch_id: foreach_batch_func(df, epoch_id))\
     .outputMode("complete") \
-    .option("checkpointLocation", "chk-point-dir") \
     .option("format","append") \
     .option("path","C:/Users/PC/Documents/Jupyter/Job_Interview_Cases/Hepsiburada/Unzip/data/") \
-    .trigger(processingTime="60 minute") \
+    .trigger(processingTime="10 seconds") \
     .start()
 
 
