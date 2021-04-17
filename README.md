@@ -153,7 +153,8 @@ def foreach_batch_func2(df, epoch_id):
 
     window_query.awaitTermination()
 ```
-- [x] Check the results
+- [x] Check the results to find most popular categories
+
 ![](result4.JPG)
 
 ### Code Description
