@@ -2,8 +2,22 @@ from pyspark.sql import SparkSession, Window
 from pyspark.sql.functions import from_json, col, to_timestamp, window, expr, sum, approx_count_distinct, desc
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 
-#Define foreach batch function to aggrate stream data several times
+#Define foreach batch function to aggrate stream data several times and sink to csv file
 def foreach_batch_func(df, epoch_id):
+    df = df.groupBy(col("categoryid")).sum("count")
+    df = df.withColumnRenamed("sum(count)","count")
+    df = df.sort(desc("count"))
+    df.coalesce(1) \
+        .write.format("csv") \
+        .option("header","true") \
+        .mode("append") \
+        .option("sep",",") \
+        .save("report.csv")
+    pass
+#Coalesce(1) prevent csv file partitioning
+
+#Define foreach batch function to aggrate stream data several times and print console
+def foreach_batch_func2(df, epoch_id):
     df = df.groupBy(col("categoryid")).sum("count")
     df = df.withColumnRenamed("sum(count)","count")
     df = df.sort(desc("count"))
@@ -11,6 +25,7 @@ def foreach_batch_func(df, epoch_id):
         .write.format("console") \
         .save()
     pass
+
 
 if __name__ == "__main__":
     spark = SparkSession \
@@ -58,30 +73,38 @@ if __name__ == "__main__":
 #Groupby product_id and count considering distinct users
 #Rename new column as count
     window_count_df = transformed_df \
-        .withWatermark("timestamp", "10 seconds") \
+        .withWatermark("timestamp", "1 minute") \
         .groupBy(col("productid"),
-            window(col("timestamp"),"10 seconds")) \
+            window(col("timestamp"),"1 minute")) \
             .agg(approx_count_distinct("userid").alias("count"))
 
 #Select everything from dataframe and sort by highest to lowest count rate
-    output_df = window_count_df.select("*").sort(desc("count"))
+    output_df = window_count_df.select("*")
 #Import category - product ID csv file
     dict_df = spark.read.csv('C:/Users/PC/Documents/Jupyter/Job_Interview_Cases/Hepsiburada/Unzip/data/product-category-map.csv')
 #Create dictionary from dataframe
     dict = dict_df.select('_c0', '_c1').rdd.collectAsMap()
 #Map current dataframe with created dictionary to replace product_id with category name
     output_df = output_df.na.replace(dict, 1)
-#Rename product_id column to category id 
+#Rename product_id column to category id
     output_df = output_df.withColumnRenamed("productid","categoryid")
 
 #Write spark stream to console or csv sink
     window_query = output_df.writeStream \
     .foreachBatch(lambda df, epoch_id: foreach_batch_func(df, epoch_id))\
-    .outputMode("complete") \
+    .outputMode("append") \
     .option("format","append") \
     .option("path","C:/Users/PC/Documents/Jupyter/Job_Interview_Cases/Hepsiburada/Unzip/data/") \
-    .trigger(processingTime="10 seconds") \
+    .trigger(processingTime="1 minute") \
     .start()
 
+#Write spark stream to console or csv sink
+    window_query_2 = output_df.writeStream \
+    .foreachBatch(lambda df, epoch_id: foreach_batch_func2(df, epoch_id))\
+    .outputMode("append") \
+    .option("format","append") \
+    .option("path","C:/Users/PC/Documents/Jupyter/Job_Interview_Cases/Hepsiburada/Unzip/data/") \
+    .trigger(processingTime="1 minute") \
+    .start()
 
     window_query.awaitTermination()
