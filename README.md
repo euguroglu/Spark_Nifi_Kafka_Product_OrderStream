@@ -30,7 +30,6 @@ In this application we used 30.000 order data and simulate those data as 1 trans
 
 ![](nifi_pipeline.JPG)
 
-- [x] Use https://randomuser.me/api/0.8 to generate random user data
 - [x] Create kafka topic
 - [x] Create spark session and define schema
 ```
