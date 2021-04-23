@@ -73,9 +73,9 @@ if __name__ == "__main__":
 #Groupby product_id and count considering distinct users
 #Rename new column as count
     window_count_df = transformed_df \
-        .withWatermark("timestamp", "1 minute") \
+        .withWatermark("timestamp", "10 minutes") \
         .groupBy(col("productid"),
-            window(col("timestamp"),"1 minute")) \
+            window(col("timestamp"),"10 minutes")) \
             .agg(approx_count_distinct("userid").alias("count"))
 
 #Select everything from dataframe and sort by highest to lowest count rate
@@ -95,7 +95,7 @@ if __name__ == "__main__":
     .outputMode("append") \
     .option("format","append") \
     .option("path","C:/Users/PC/Documents/Jupyter/Job_Interview_Cases/Hepsiburada/Unzip/data/") \
-    .trigger(processingTime="1 minute") \
+    .trigger(processingTime="10 minutes") \
     .start()
 
 #Write spark stream to console or csv sink
@@ -104,7 +104,7 @@ if __name__ == "__main__":
     .outputMode("append") \
     .option("format","append") \
     .option("path","C:/Users/PC/Documents/Jupyter/Job_Interview_Cases/Hepsiburada/Unzip/data/") \
-    .trigger(processingTime="1 minute") \
+    .trigger(processingTime="10 minutes") \
     .start()
 
     window_query.awaitTermination()
