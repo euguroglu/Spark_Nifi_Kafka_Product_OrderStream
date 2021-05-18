@@ -1,1 +1,1 @@
-spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.0.1 nifi_spark_kafka_product_bought_v2.py
+spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.0.1,mysql:mysql-connector-java:8.0.17 nifi_spark_kafka_product_bought_v3.py

@@ -2,7 +2,7 @@ from pyspark.sql import SparkSession, Window
 from pyspark.sql.functions import from_json, col, to_timestamp, window, expr, sum, approx_count_distinct, desc
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 
-#Define foreach batch function to aggrate stream data several times and sink to csv file
+#Define foreach batch function to aggregate stream data several times and sink to csv file
 def foreach_batch_func(df, epoch_id):
     df = df.groupBy(col("categoryid")).sum("count")
     df = df.withColumnRenamed("sum(count)","count")
@@ -87,24 +87,49 @@ if __name__ == "__main__":
 
 #Select everything from dataframe and sort by highest to lowest count rate
     output_df = window_count_df.select("*")
-#Import category - product ID csv file
-    dict_df = spark.read.csv('C:/Users/PC/Documents/Jupyter/Job_Interview_Cases/Hepsiburada/Unzip/data/product-category-map.csv')
-#Create dictionary from dataframe
-    dict = dict_df.select('_c0', '_c1').rdd.collectAsMap()
-#Map current dataframe with created dictionary to replace product_id with category name
-    output_df = output_df.na.replace(dict, 1)
-#Rename product_id column to category id
-    output_df = output_df.withColumnRenamed("productid","categoryid")
 
+    output_df.printSchema()
+
+#Example of how read from mysql database
+    map_df = spark.read \
+        .format("jdbc") \
+        .option("url", "jdbc:mysql://localhost:3306/?useLegacyDatetimeCode=false&serverTimezone=UTC") \
+        .option("driver", "com.mysql.cj.jdbc.Driver") \
+        .option("dbtable", "mysql.map") \
+        .option("user", "root") \
+        .option("password", "03574526").load()
+
+    map_df.show()
+
+# Define join statements
+    join_expr = output_df.productid == map_df.productid
+    join_type = "inner"
+
+# Join new data from kafka (streaming data) with existing data from cassandra (static data)
+    joined_df = output_df.join(map_df, join_expr, join_type) \
+        .drop(output_df.productid)
+
+    joined_df.printSchema()
+
+#Below is old method using rdd after collecting data, but it is not efficient since it may cause memory problem
+#Import category - product ID csv file
+#     dict_df = spark.read.csv('C:/Users/PC/Documents/Jupyter/Job_Interview_Cases/Hepsiburada/Unzip/data/product-category-map.csv')
+# #Create dictionary from dataframe
+#     dict = dict_df.select('_c0', '_c1').rdd.collectAsMap()
+# #Map current dataframe with created dictionary to replace product_id with category name
+#     output_df = output_df.na.replace(dict, 1)
+# #Rename product_id column to category id
+#     output_df = output_df.withColumnRenamed("productid","categoryid")
+#
 #Write spark stream to console or csv sink
-    window_query = output_df.writeStream \
+    window_query = joined_df.writeStream \
     .foreachBatch(lambda df, epoch_id: foreach_batch_func(df, epoch_id))\
     .outputMode("append") \
     .trigger(processingTime="2 minutes") \
     .start()
 
 #Write spark stream to console or csv sink
-    window_query_2 = output_df.writeStream \
+    window_query_2 = joined_df.writeStream \
     .foreachBatch(lambda df, epoch_id: foreach_batch_func2(df, epoch_id))\
     .outputMode("append") \
     .option("format","append") \
