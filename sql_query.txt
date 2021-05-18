@@ -1,5 +1,12 @@
 select t.click_count,t.order_count,round(t.click_count/t.order_count,2) from (
-select report.timestamp,report.categoryid,report.count as click_count,report_2.count as order_count 
+select report.timestamp,report.categoryid,report.count as click_count,report_2.count as order_count
 from report inner join report_2 on report.categoryid = report_2.categoryid
 where report.timestamp<'2021-04-23 22:56:10' and report.timestamp>'2021-04-23 22:54:10' and report_2.timestamp<'2021-04-23 22:56:10' and report_2.timestamp>'2021-04-23 22:54:10'
 ) as t;
+
+
+
+// Create map table
+
+create table map
+(productid varchar(50), categoryid varchar(50));
